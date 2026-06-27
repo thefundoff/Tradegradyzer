@@ -1,0 +1,27 @@
+# Supabase local/project config. `project_id` is set when you run `supabase link`.
+project_id = "tradegradyzer"
+
+[functions.analyze-chart]
+# JWT verification stays ON so only signed-in users can call the analyzer.
+verify_jwt = true
+
+[functions.mock-subscribe]
+# Only signed-in users can activate a subscription.
+verify_jwt = true
+
+[functions.paystack-verify]
+# Signed-in users verify their own transaction.
+verify_jwt = true
+
+[functions.paystack-webhook]
+# Paystack calls this with no JWT — auth is the signature check instead.
+verify_jwt = false
+
+[functions.cancel-subscription]
+# Only signed-in users can cancel their own subscription.
+verify_jwt = true
+
+[functions.send-password-reset]
+# Public — the user isn't signed in when requesting a reset. The function avoids
+# email enumeration and relies on Supabase's short-lived recovery-link expiry.
+verify_jwt = false

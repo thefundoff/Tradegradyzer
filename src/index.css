@@ -1,0 +1,147 @@
+@import 'tailwindcss';
+
+/* ── Design tokens (Vercel / Geist inspired) ─────────────────── */
+@theme {
+  --color-bg: #000000;
+  --color-bg-subtle: #0a0a0a;
+  --color-card: #0a0a0a;
+  --color-card-hover: #0f0f0f;
+  --color-border: #1f1f1f;
+  --color-border-hover: #2e2e2e;
+
+  --color-fg: #ededed;
+  --color-muted: #8f8f8f;
+  --color-faint: #5a5a5a;
+
+  /* Brand accent — a warm, luminous gold (replaces the old white accent). */
+  --color-accent: #e8b84b;
+  --color-accent-hover: #f2c766;
+  --color-accent-fg: #1a1404; /* near-black text for use on top of gold */
+
+  /* Functional status colors (kept muted, used for meaning only) */
+  --color-grade-aplus: #4ade80;
+  --color-grade-b: #5e8bff;
+  --color-grade-c: #f5c451;
+  --color-grade-f: #ff5c5c;
+
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+
+  --radius-card: 0.75rem;
+}
+
+/* ── Base ────────────────────────────────────────────────────── */
+* {
+  -webkit-tap-highlight-color: transparent;
+  border-color: var(--color-border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-fg);
+  background: var(--color-bg);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(232, 184, 75, 0.25);
+}
+
+/* Hide the browser's built-in password reveal/clear (Edge/IE) — we render our own eye */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+/* Keep autofilled inputs on the dark theme so text + our controls stay visible */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-fg);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-bg-subtle) inset;
+  caret-color: var(--color-fg);
+}
+
+/* Subtle grid + top glow background — quiet, monochrome */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--color-bg);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 35%, transparent 100%);
+}
+
+.app-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 45% at 50% -10%, rgba(232, 184, 75, 0.08), transparent 70%);
+}
+
+/* ── Surface utilities (flat, bordered — not glassy) ─────────── */
+@utility glass {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+@utility glass-strong {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border-hover);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Monochrome heading gradient (white → grey), the Vercel signature */
+@utility text-gradient {
+  background: linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-hover);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Shimmer for loading states */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: shimmer 1.6s infinite;
+}
