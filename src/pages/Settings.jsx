@@ -77,8 +77,8 @@ export default function Settings() {
   }
 
   const handleSignOut = async () => {
-    await signOut()
     navigate('/')
+    await signOut()
   }
 
   return (

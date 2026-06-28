@@ -27,8 +27,8 @@ export default function AppLayout() {
 
   const handleSignOut = async () => {
     setMenuOpen(false)
-    await signOut()
     navigate('/')
+    await signOut()
   }
 
   const name = profile?.full_name || user?.email?.split('@')[0] || 'Trader'

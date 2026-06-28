@@ -7,6 +7,10 @@ export const useAuthStore = create((set, get) => ({
   profile: null,
   loading: true,
   initialized: false,
+  // True briefly during an explicit sign-out so ProtectedRoute doesn't ALSO
+  // redirect the (still-animating-out) protected page to /login and deadlock
+  // the page transition. The sign-out handler navigates to '/' itself.
+  signingOut: false,
 
   /** Bootstrap session + subscribe to auth changes. Call once at app start. */
   init: async () => {
@@ -81,8 +85,12 @@ export const useAuthStore = create((set, get) => ({
   },
 
   signOut: async () => {
+    set({ signingOut: true })
     await supabase.auth.signOut()
     set({ user: null, session: null, profile: null })
+    // Clear the flag once the route transition has settled, so future
+    // unauthenticated access still redirects to /login normally.
+    setTimeout(() => set({ signingOut: false }), 600)
   },
 
   /**

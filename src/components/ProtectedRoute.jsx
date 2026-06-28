@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore'
 import Spinner from './ui/Spinner'
 
 export default function ProtectedRoute({ children }) {
-  const { user, profile, loading } = useAuthStore()
+  const { user, profile, loading, signingOut } = useAuthStore()
   const location = useLocation()
 
   if (loading) {
@@ -15,6 +15,10 @@ export default function ProtectedRoute({ children }) {
   }
 
   if (!user) {
+    // Mid sign-out the handler is already routing to '/'. Redirecting to
+    // /login from here too would deadlock the page transition, so just let
+    // this page animate out.
+    if (signingOut) return null
     return <Navigate to="/login" replace state={{ from: location }} />
   }
 
