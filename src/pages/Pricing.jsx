@@ -166,9 +166,9 @@ export default function Pricing() {
                           {plan.regularDisplay}
                         </div>
                       )}
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-extrabold">{plan.display}</span>
-                        <span className="text-white/50">/ {plan.interval}</span>
+                      <div className="flex flex-wrap items-baseline gap-x-1">
+                        <span className="text-4xl font-extrabold break-words">{plan.display}</span>
+                        <span className="whitespace-nowrap text-white/50">/ {plan.interval}</span>
                       </div>
                     </>
                   )}
