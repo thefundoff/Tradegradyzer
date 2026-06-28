@@ -87,8 +87,8 @@ export default function Dashboard() {
             <div>
               <p className="font-semibold">You're on the Free plan</p>
               <p className="text-sm text-white/55">
-                {quota ? `${quota.remaining} of ${quota.limit}` : '1'} free analysis left today.
-                Subscribe for 15/week or 60/month.
+                {quota ? `${quota.remaining} of ${quota.limit}` : '1'} free analysis left.
+                It's a one-time trial — subscribe for 15/week or 60/month.
               </p>
             </div>
             <Button>

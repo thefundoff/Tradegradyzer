@@ -15,7 +15,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 const PRICE_TIERS: Record<string, { weekly: number; monthly: number; lifetime: number }> = {
   USD: { weekly: 5, monthly: 15, lifetime: 5 },
-  NGN: { weekly: 3900, monthly: 14000, lifetime: 5000 },
+  NGN: { weekly: 3900, monthly: 14000, lifetime: 15000 },
   GHS: { weekly: 70, monthly: 200, lifetime: 70 },
   ZAR: { weekly: 90, monthly: 270, lifetime: 95 },
   KES: { weekly: 650, monthly: 1900, lifetime: 700 },

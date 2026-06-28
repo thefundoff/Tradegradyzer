@@ -13,6 +13,12 @@ import {
   DEFAULT_TF_SLOTS,
   MAX_TF_SLOTS,
   MIN_TF_SLOTS,
+  TRADER_STYLES,
+  TRADE_SETUPS,
+  RISK_APPETITES,
+  MARKETS,
+  labelFor,
+  labelsFor,
 } from '../lib/constants'
 import { analyzeCharts } from '../lib/analyzer'
 import { saveAnalysis, getCalibration } from '../lib/analyses'
@@ -23,8 +29,19 @@ let _slotId = 0
 const newSlot = (tf) => ({ id: ++_slotId, tf, file: null })
 
 export default function Analyze() {
-  const { user } = useAuthStore()
+  const { user, profile } = useAuthStore()
   const navigate = useNavigate()
+
+  // The trader's saved style/setups/risk/markets, as human-readable labels for
+  // the AI prompt. Null until they've onboarded.
+  const traderProfile = profile?.trader_style
+    ? {
+        style: labelFor(TRADER_STYLES, profile.trader_style),
+        setups: labelsFor(TRADE_SETUPS, profile.setups),
+        risk: profile.risk_appetite ? labelFor(RISK_APPETITES, profile.risk_appetite) : null,
+        markets: labelsFor(MARKETS, profile.markets),
+      }
+    : null
 
   const [slots, setSlots] = useState(() => DEFAULT_TF_SLOTS.map(newSlot))
   const [pair, setPair] = useState('')
@@ -88,7 +105,7 @@ export default function Analyze() {
       const files = buildFiles()
       // Feed the AI this trader's own grade-vs-outcome history so it self-calibrates.
       const calibration = await getCalibration(user.id).catch(() => null)
-      const result = await analyzeCharts(files, { pair, notes, calibration })
+      const result = await analyzeCharts(files, { pair, notes, calibration, traderProfile })
 
       // Blocked: a chart's real timeframe doesn't match its slot — ask the
       // user to fix the dropdown rather than producing a misleading grade.
@@ -97,7 +114,7 @@ export default function Analyze() {
         setLoading(false)
         return
       }
-      // Server-enforced quota (free 1/day, weekly 15, monthly 60).
+      // Server-enforced quota (free 1 ever, weekly 15, monthly 60).
       if (result?.status === 'limit_reached') {
         setGate(result)
         setLoading(false)
@@ -254,10 +271,9 @@ export default function Analyze() {
                 </>
               ) : (
                 <>
-                  <h2 className="text-xl font-bold">Daily free limit reached</h2>
+                  <h2 className="text-xl font-bold">Free trial used</h2>
                   <p className="mt-2 text-sm text-white/60">
-                    You've used your free analysis for today. Subscribe for more, or come back
-                    tomorrow.
+                    You've used your one free analysis. Upgrade to a plan to keep analyzing.
                   </p>
                 </>
               )}

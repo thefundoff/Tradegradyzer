@@ -34,6 +34,50 @@ export const CONFIDENCE = {
   F: { label: 'F', color: 'var(--color-grade-f)', desc: 'Avoid — no clean edge' },
 }
 
+// ── Trader profile taxonomy ──────────────────────────────────────
+// Captured at signup / onboarding and used to tailor the AI analysis
+// (entry, stop, target) to how each trader actually trades. Keep the
+// `id` values stable — they're stored on profiles and read in the prompt.
+export const TRADER_STYLES = [
+  { id: 'scalper', label: 'Scalper', hint: 'Seconds–minutes; tight stops, fast targets' },
+  { id: 'day', label: 'Day trader', hint: 'Intraday; flat by session end' },
+  { id: 'swing', label: 'Swing trader', hint: 'Days–weeks; rides larger moves' },
+  { id: 'position', label: 'Position trader', hint: 'Weeks–months; macro structure' },
+]
+
+export const TRADE_SETUPS = [
+  { id: 'fvg', label: 'Fair Value Gap (FVG)' },
+  { id: 'order_block', label: 'Order Block' },
+  { id: 'mitigation_block', label: 'Mitigation Block' },
+  { id: 'breaker', label: 'Breaker Block' },
+  { id: 'liquidity_sweep', label: 'Liquidity Sweep / Grab' },
+  { id: 'support_resistance', label: 'Support & Resistance' },
+  { id: 'supply_demand', label: 'Supply & Demand' },
+  { id: 'break_retest', label: 'Break & Retest' },
+  { id: 'trendline', label: 'Trendline / Channel' },
+  { id: 'fibonacci', label: 'Fibonacci Retracement' },
+  { id: 'chart_patterns', label: 'Chart Patterns (H&S, triangles…)' },
+  { id: 'moving_average', label: 'Moving Averages' },
+]
+
+export const RISK_APPETITES = [
+  { id: 'conservative', label: 'Conservative', hint: 'Tighter stops, min ~2R+, skip marginal setups' },
+  { id: 'balanced', label: 'Balanced', hint: 'Standard ~1.5–2R targets' },
+  { id: 'aggressive', label: 'Aggressive', hint: 'Wider targets, let winners run' },
+]
+
+export const MARKETS = [
+  { id: 'forex', label: 'Forex' },
+  { id: 'crypto', label: 'Crypto' },
+  { id: 'indices', label: 'Indices' },
+  { id: 'stocks', label: 'Stocks' },
+  { id: 'commodities', label: 'Commodities' },
+]
+
+// Lookup helpers for turning stored ids back into human labels (for prompts/UI).
+export const labelFor = (list, id) => list.find((x) => x.id === id)?.label || id
+export const labelsFor = (list, ids = []) => (ids || []).map((id) => labelFor(list, id))
+
 export const PLANS = [
   {
     id: 'weekly',
@@ -76,7 +120,9 @@ export const PLANS = [
   },
 ]
 
-// Free plan: 1 analysis per rolling 24h (enforced server-side in the edge function).
+// Free plan: ONE free analysis ever (lifetime, not per-day). Once used, the
+// user must upgrade. Enforced server-side in the edge function by counting
+// the user's all-time usage_events (no rolling window).
 export const FREE_ANALYSIS_LIMIT = 1
 
 // Lifetime campaign: hard cap on how many lifetime seats can ever be sold.
@@ -85,7 +131,8 @@ export const LIFETIME_LIMIT = 100
 
 // Analysis quotas per plan (enforced server-side). `days` = rolling window.
 export const PLAN_QUOTAS = {
-  free: { limit: 1, days: 1, label: 'day' },
+  // `days: null` ⇒ all-time window: the free analysis is once forever.
+  free: { limit: 1, days: null, label: 'forever' },
   weekly: { limit: 15, days: 7, label: 'week' },
   monthly: { limit: 60, days: 30, label: 'month' },
   // Lifetime: one-time purchase, 25 analyses per rolling 30 days, never expires.
@@ -97,7 +144,7 @@ export const PLAN_QUOTAS = {
 // listed falls back to USD. These are the amounts you'd charge via Paystack.
 export const PRICE_TIERS = {
   USD: { weekly: 5, monthly: 15, lifetime: 5 },
-  NGN: { weekly: 3900, monthly: 14000, lifetime: 5000 },
+  NGN: { weekly: 3900, monthly: 14000, lifetime: 15000 },
   GHS: { weekly: 70, monthly: 200, lifetime: 70 },
   ZAR: { weekly: 90, monthly: 270, lifetime: 95 },
   KES: { weekly: 650, monthly: 1900, lifetime: 700 },
@@ -110,7 +157,7 @@ export const PRICE_TIERS = {
 
 // "Regular" (compare-at) prices shown struck-through on the Lifetime card to
 // anchor the discount. Localized per currency, mirroring PRICE_TIERS. Only the
-// lifetime plan uses these today — anchored on NGN ₦96,000 (~19.2× the deal).
+// lifetime plan uses these today — anchored on NGN ₦96,000 (~6.4× the ₦15,000 deal).
 export const REGULAR_PRICE_TIERS = {
   USD: { lifetime: 96 },
   NGN: { lifetime: 96000 },

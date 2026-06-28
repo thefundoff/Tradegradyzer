@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Target, ShieldX, TrendingUp, AlertTriangle, Brain, X } from 'lucide-react'
+import { ArrowLeft, Target, ShieldX, TrendingUp, AlertTriangle, Brain, UserCog, X } from 'lucide-react'
 import GlassCard from '../components/ui/GlassCard'
 import ScoreRing from '../components/ui/ScoreRing'
 import ConfidenceBadge from '../components/ui/ConfidenceBadge'
@@ -131,6 +131,13 @@ export default function AnalysisResult() {
           )}
 
           {r.summary && <p className="mt-6 text-sm leading-relaxed text-white/70">{r.summary}</p>}
+
+          {r.tailored && (
+            <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 px-3 py-2.5 text-sm">
+              <UserCog size={16} className="mt-0.5 shrink-0 text-[var(--color-accent)]" />
+              <span className="text-white/80">{r.tailored}</span>
+            </div>
+          )}
 
           {r.warnings?.length > 0 && (
             <div className="mt-4 space-y-2">

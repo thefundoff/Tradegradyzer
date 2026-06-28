@@ -1,3 +1,4 @@
+import { lazy, Suspense, Component } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { LineChart, ScanLine, Target, Gauge, Layers, ShieldCheck, ArrowRight } from 'lucide-react'
@@ -6,6 +7,9 @@ import Button from '../components/ui/Button'
 import PageTransition from '../components/ui/PageTransition'
 import { useAuthStore } from '../store/authStore'
 
+// three.js scene is heavy — load it lazily so it never blocks first paint.
+const HeroScene = lazy(() => import('../components/HeroScene'))
+
 const features = [
   { icon: Layers, title: 'Multi-timeframe', desc: 'Upload 4H, 1H and 30M charts for a top-down read of your setup.' },
   { icon: Target, title: 'Key levels & entry', desc: 'AI marks support, resistance and an optimal entry directly on your chart.' },
@@ -13,14 +17,58 @@ const features = [
   { icon: ShieldCheck, title: 'Confidence grade', desc: 'A clear A+, B, C or F rating tells you when to act and when to wait.' },
 ]
 
+// Shown while the 3D scene loads and as the no-WebGL fallback.
+function StaticHeroCard() {
+  return (
+    <GlassCard strong className="p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-white/40">Setup score</p>
+          <p className="text-5xl font-bold text-emerald-400">87%</p>
+        </div>
+        <div className="grid h-16 w-16 place-items-center rounded-2xl border border-emerald-400/40 bg-emerald-400/10 text-2xl font-extrabold text-emerald-400">
+          A+
+        </div>
+      </div>
+      <div className="mt-6 space-y-2">
+        {[
+          ['4H', 'Bullish structure, HTF demand'],
+          ['1H', 'Break & retest confirmed'],
+          ['30M', 'Entry at order block'],
+        ].map(([tf, txt]) => (
+          <div key={tf} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
+            <span className="grid h-7 w-9 place-items-center rounded-md bg-white/10 text-[11px] font-bold">{tf}</span>
+            <span className="text-sm text-white/70">{txt}</span>
+          </div>
+        ))}
+      </div>
+    </GlassCard>
+  )
+}
+
+// If WebGL is unavailable or the scene errors, fall back to the static card.
+class SceneBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { failed: false }
+  }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    if (this.state.failed) return this.props.fallback
+    return this.props.children
+  }
+}
+
 export default function Landing() {
   const user = useAuthStore((s) => s.user)
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-6xl px-5 py-6">
+      <div className="relative mx-auto w-full max-w-6xl px-5 py-6">
         {/* Nav */}
-        <header className="flex items-center justify-between py-2">
+        <header className="relative z-10 flex items-center justify-between py-2">
           <div className="flex items-center gap-2">
             <div className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)]">
               <LineChart size={18} className="text-black" />
@@ -48,8 +96,15 @@ export default function Landing() {
         </header>
 
         {/* Hero */}
-        <section className="grid items-center gap-10 py-14 md:grid-cols-2 md:py-24">
-          <div>
+        <section className="relative grid items-center gap-10 py-14 md:grid-cols-2 md:py-20">
+          {/* Aurora glows behind the hero */}
+          <div className="pointer-events-none absolute inset-0 -z-0 overflow-visible">
+            <div className="aurora left-[-6%] top-[2%] h-72 w-72" style={{ background: 'radial-gradient(circle, rgba(232,184,75,0.40), transparent 70%)' }} />
+            <div className="aurora right-[2%] top-[18%] h-80 w-80" style={{ background: 'radial-gradient(circle, rgba(94,139,255,0.32), transparent 70%)', animationDelay: '-5s' }} />
+            <div className="aurora bottom-[-10%] left-[28%] h-64 w-64" style={{ background: 'radial-gradient(circle, rgba(74,222,128,0.26), transparent 70%)', animationDelay: '-9s' }} />
+          </div>
+
+          <div className="relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -72,7 +127,7 @@ export default function Landing() {
               className="mt-5 max-w-md text-white/60"
             >
               Upload your 4H, 1H and 30M charts. TradeGradyzer's AI marks your key levels, scores the
-              setup and pinpoints a clean entry — in seconds.
+              setup and pinpoints a clean entry — tuned to how you trade.
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -91,41 +146,34 @@ export default function Landing() {
             </motion.div>
           </div>
 
+          {/* 3D candlestick scene */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, rotate: -2 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 120 }}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 110 }}
+            className="relative z-10 h-[320px] sm:h-[400px] md:h-[440px]"
           >
-            <GlassCard strong className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-white/40">Setup score</p>
-                  <p className="text-5xl font-bold text-emerald-400">87%</p>
-                </div>
-                <div className="grid h-16 w-16 place-items-center rounded-2xl border border-emerald-400/40 bg-emerald-400/10 text-2xl font-extrabold text-emerald-400">
-                  A+
-                </div>
-              </div>
-              <div className="mt-6 space-y-2">
-                {[
-                  ['4H', 'Bullish structure, HTF demand'],
-                  ['1H', 'Break & retest confirmed'],
-                  ['30M', 'Entry at order block'],
-                ].map(([tf, txt]) => (
-                  <div key={tf} className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
-                    <span className="grid h-7 w-9 place-items-center rounded-md bg-white/10 text-[11px] font-bold">
-                      {tf}
-                    </span>
-                    <span className="text-sm text-white/70">{txt}</span>
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
+            {/* Floating setup chips over the scene */}
+            <div className="float-y pointer-events-none absolute -left-2 top-4 z-20 hidden rounded-xl border border-[var(--color-accent)]/30 bg-black/55 px-3 py-1.5 text-xs font-semibold backdrop-blur sm:block" style={{ animationDelay: '-1s' }}>
+              FVG ✓
+            </div>
+            <div className="float-y pointer-events-none absolute right-0 top-1/3 z-20 hidden rounded-xl border border-emerald-400/30 bg-black/55 px-3 py-1.5 text-xs font-semibold backdrop-blur sm:block" style={{ animationDelay: '-3s' }}>
+              Order Block ✓
+            </div>
+            <div className="float-y pointer-events-none absolute bottom-2 left-8 z-20 hidden rounded-xl border border-white/15 bg-black/55 px-3 py-1.5 text-xs font-semibold backdrop-blur sm:block" style={{ animationDelay: '-2s' }}>
+              R:R ≈ 2.6
+            </div>
+
+            <SceneBoundary fallback={<div className="grid h-full place-items-center"><StaticHeroCard /></div>}>
+              <Suspense fallback={<div className="grid h-full place-items-center"><StaticHeroCard /></div>}>
+                <HeroScene />
+              </Suspense>
+            </SceneBoundary>
           </motion.div>
         </section>
 
         {/* Features */}
-        <section className="grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="relative z-10 grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((f, i) => (
             <motion.div
               key={f.title}
@@ -133,6 +181,7 @@ export default function Landing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.05 }}
+              whileHover={{ y: -6 }}
             >
               <GlassCard hover className="h-full p-5">
                 <f.icon size={22} className="text-white/80" />

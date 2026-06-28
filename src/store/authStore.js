@@ -46,11 +46,21 @@ export const useAuthStore = create((set, get) => ({
     set({ profile: data ?? null })
   },
 
-  signUp: async (email, password, fullName) => {
+  signUp: async (email, password, fullName, tradingProfile = null) => {
+    // The trading profile rides along as user metadata; the handle_new_user
+    // DB trigger persists it onto the profiles row (works even when email
+    // confirmation is on and there's no client session yet).
+    const data0 = { full_name: fullName }
+    if (tradingProfile) {
+      if (tradingProfile.style) data0.trader_style = tradingProfile.style
+      if (tradingProfile.setups) data0.setups = tradingProfile.setups
+      if (tradingProfile.risk) data0.risk_appetite = tradingProfile.risk
+      if (tradingProfile.markets) data0.markets = tradingProfile.markets
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: data0 },
     })
     if (error) throw error
     return data
@@ -93,6 +103,25 @@ export const useAuthStore = create((set, get) => ({
   updatePassword: async (password) => {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) throw error
+  },
+
+  /**
+   * Save the trader's profile (style / setups / risk / markets) and mark them
+   * onboarded. Used by the /onboarding gate and the Settings editor.
+   */
+  updateTradingProfile: async (tp) => {
+    const user = get().user
+    if (!user) throw new Error('Not signed in.')
+    const patch = {
+      trader_style: tp.style || null,
+      setups: tp.setups || [],
+      risk_appetite: tp.risk || null,
+      markets: tp.markets || [],
+      onboarded: true,
+    }
+    const { error } = await supabase.from('profiles').update(patch).eq('id', user.id)
+    if (error) throw error
+    await get().fetchProfile()
   },
 
   /**

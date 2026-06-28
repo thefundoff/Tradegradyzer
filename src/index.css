@@ -145,3 +145,28 @@ input:-webkit-autofill:focus {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
   animation: shimmer 1.6s infinite;
 }
+
+/* Aurora glow + floating — landing page liveliness */
+@keyframes aurora-drift {
+  0%   { transform: translate3d(-8%, -4%, 0) scale(1);   opacity: 0.55; }
+  50%  { transform: translate3d(8%, 6%, 0) scale(1.18);  opacity: 0.85; }
+  100% { transform: translate3d(-8%, -4%, 0) scale(1);   opacity: 0.55; }
+}
+.aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  pointer-events: none;
+  will-change: transform, opacity;
+  animation: aurora-drift 14s ease-in-out infinite;
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+.float-y { animation: float-y 5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora { animation: none; }
+  .float-y { animation: none; }
+}

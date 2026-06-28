@@ -3,15 +3,22 @@ import { PLAN_QUOTAS } from './constants'
 
 const BUCKET = 'charts'
 
-/** How many analyses the user has left in the current rolling period. */
+/**
+ * How many analyses the user has left. For rolling plans (`days` set) this
+ * counts usage in the current window; for the free plan (`days: null`) it
+ * counts ALL-TIME usage, so the free analysis is once forever.
+ */
 export async function getRemainingQuota(userId, planKey = 'free') {
   const q = PLAN_QUOTAS[planKey] || PLAN_QUOTAS.free
-  const since = new Date(Date.now() - q.days * 24 * 60 * 60 * 1000).toISOString()
-  const { count } = await supabase
+  let query = supabase
     .from('usage_events')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .gte('created_at', since)
+  if (q.days != null) {
+    const since = new Date(Date.now() - q.days * 24 * 60 * 60 * 1000).toISOString()
+    query = query.gte('created_at', since)
+  }
+  const { count } = await query
   const used = count || 0
   return { limit: q.limit, used, remaining: Math.max(0, q.limit - used), label: q.label }
 }

@@ -1,34 +1,52 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, User } from 'lucide-react'
+import { Mail, Lock, User, ArrowLeft, ArrowRight } from 'lucide-react'
 import AuthShell from '../components/layout/AuthShell'
 import Field from '../components/ui/Field'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
+import TradingProfileForm from '../components/TradingProfileForm'
 import { useAuthStore } from '../store/authStore'
 
 export default function Signup() {
   const { signUp, signInWithGoogle } = useAuthStore()
   const navigate = useNavigate()
 
+  const [step, setStep] = useState(1)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [tp, setTp] = useState({ style: '', setups: [], risk: '', markets: [] })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Step 1 → validate account fields, then advance to the trading profile.
+  const next = (e) => {
+    e.preventDefault()
+    setError('')
+    if (!fullName || !email) {
+      setError('Please fill in your name and email.')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+    setStep(2)
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     setError('')
     setNotice('')
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.')
+    if (!tp.style) {
+      setError('Pick the kind of trader you are so we can tailor your analysis.')
       return
     }
     setLoading(true)
     try {
-      const { session } = await signUp(email, password, fullName)
+      const { session } = await signUp(email, password, fullName, tp)
       if (session) {
         navigate('/dashboard', { replace: true })
       } else {
@@ -39,6 +57,36 @@ export default function Signup() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (step === 2) {
+    return (
+      <AuthShell
+        title="Tell us how you trade"
+        subtitle="We tune every grade — entry, stop and target — to your style."
+        footer={
+          <button
+            type="button"
+            onClick={() => {
+              setStep(1)
+              setError('')
+            }}
+            className="inline-flex items-center gap-1 font-medium text-white/70 hover:text-white"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+        }
+      >
+        <form onSubmit={submit} className="space-y-5">
+          <TradingProfileForm value={tp} onChange={setTp} />
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          {notice && <p className="text-sm text-emerald-400">{notice}</p>}
+          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+            {loading ? <Spinner /> : 'Create account'}
+          </Button>
+        </form>
+      </AuthShell>
+    )
   }
 
   return (
@@ -54,7 +102,7 @@ export default function Signup() {
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={next} className="space-y-4">
         <Field
           label="Full name"
           icon={User}
@@ -82,9 +130,10 @@ export default function Signup() {
           required
         />
         {error && <p className="text-sm text-red-400">{error}</p>}
-        {notice && <p className="text-sm text-emerald-400">{notice}</p>}
-        <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading ? <Spinner /> : 'Create account'}
+        <Button type="submit" size="lg" className="w-full">
+          <span className="flex items-center gap-2">
+            Continue <ArrowRight size={18} />
+          </span>
         </Button>
       </form>
 

@@ -48,11 +48,22 @@ export async function analyzeCharts(files, meta = {}) {
       pair: meta.pair || '',
       notes: meta.notes || '',
       calibration: meta.calibration || null,
+      traderProfile: meta.traderProfile || null,
     },
   })
 
   if (error) {
-    throw new Error(error.message || 'Analysis failed. Please try again.')
+    // supabase-js throws a generic "non-2xx status code" message and hides the
+    // real body on error.context (the original Response). Pull the function's
+    // own { error } message out so failures are actually diagnosable.
+    let detail = error.message || 'Analysis failed. Please try again.'
+    try {
+      const body = await error.context?.json?.()
+      if (body?.error) detail = body.detail ? `${body.error}: ${body.detail}` : body.error
+    } catch {
+      /* body not JSON / already consumed — keep the generic message */
+    }
+    throw new Error(detail)
   }
   // The function may block instead of rating — pass these statuses through:
   //  - timeframe_mismatch: a chart's real timeframe doesn't match its slot
@@ -72,6 +83,7 @@ export function normalizeResult(raw) {
     bias: r.bias || 'neutral',
     pair: r.pair || '',
     summary: r.summary || '',
+    tailored: r.tailored || '',
     entry: r.entry || null,
     stopLoss: r.stopLoss ?? null,
     takeProfit: r.takeProfit ?? null,
@@ -108,6 +120,9 @@ function mockAnalyze(entries, meta) {
             `Mock analysis — ${bias} structure aligning across timeframes. ` +
             `Higher timeframe shows a clear trend with a pullback into a demand zone. ` +
             `Set VITE_USE_MOCK_ANALYZER=false and deploy the edge function for real Gemini analysis.`,
+          tailored: meta.traderProfile?.setups?.length
+            ? `Entry framed as a ${meta.traderProfile.setups[0]} to match your ${meta.traderProfile.style || 'trading'} style.`
+            : '',
           entry: { price: 100.5, type: 'limit', rationale: 'Retest of broken structure / order block.' },
           stopLoss: 98.2,
           takeProfit: 106.8,

@@ -6,13 +6,14 @@ import Button from '../components/ui/Button'
 import Field from '../components/ui/Field'
 import Spinner from '../components/ui/Spinner'
 import PageTransition from '../components/ui/PageTransition'
+import TradingProfileForm from '../components/TradingProfileForm'
 import { useAuthStore } from '../store/authStore'
 import { useInstall } from '../lib/installState'
 import { cancelSubscription } from '../lib/analyses'
 import { supabase } from '../lib/supabase'
 
 export default function Settings() {
-  const { user, profile, isSubscribed, signOut, fetchProfile } = useAuthStore()
+  const { user, profile, isSubscribed, signOut, fetchProfile, updateTradingProfile } = useAuthStore()
   const navigate = useNavigate()
   const { canInstall, isIOS, standalone, promptInstall } = useInstall()
   const [name, setName] = useState(profile?.full_name || '')
@@ -20,6 +21,29 @@ export default function Settings() {
   const [saved, setSaved] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [canceling, setCanceling] = useState(false)
+
+  // Trading profile editor
+  const [tp, setTp] = useState({
+    style: profile?.trader_style || '',
+    setups: profile?.setups || [],
+    risk: profile?.risk_appetite || '',
+    markets: profile?.markets || [],
+  })
+  const [savingTp, setSavingTp] = useState(false)
+  const [savedTp, setSavedTp] = useState(false)
+
+  const saveTp = async () => {
+    setSavingTp(true)
+    setSavedTp(false)
+    try {
+      await updateTradingProfile(tp)
+      setSavedTp(true)
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setSavingTp(false)
+    }
+  }
 
   const canceled = profile?.subscription_status === 'canceled'
   const isLifetime = profile?.subscription_plan === 'lifetime'
@@ -71,6 +95,22 @@ export default function Settings() {
               {saving ? <Spinner /> : 'Save changes'}
             </Button>
             {saved && <span className="text-sm text-emerald-400">Saved ✓</span>}
+          </div>
+        </GlassCard>
+
+        <GlassCard className="space-y-5 p-6">
+          <div>
+            <h2 className="font-semibold">Trading profile</h2>
+            <p className="mt-0.5 text-sm text-white/55">
+              We tune every grade — entry, stop and target — to how you trade.
+            </p>
+          </div>
+          <TradingProfileForm value={tp} onChange={setTp} compact />
+          <div className="flex items-center gap-3">
+            <Button onClick={saveTp} disabled={savingTp}>
+              {savingTp ? <Spinner /> : 'Save trading profile'}
+            </Button>
+            {savedTp && <span className="text-sm text-emerald-400">Saved ✓</span>}
           </div>
         </GlassCard>
 

@@ -24,8 +24,10 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
 // Analysis quotas per plan (rolling window). Must mirror src/lib/constants.js.
-const PLAN_QUOTAS: Record<string, { limit: number; days: number }> = {
-  free: { limit: 1, days: 1 },
+// `days: null` ⇒ all-time window. The free analysis is once forever, not
+// per-day: it's enforced by counting the user's entire usage history.
+const PLAN_QUOTAS: Record<string, { limit: number; days: number | null }> = {
+  free: { limit: 1, days: null },
   weekly: { limit: 15, days: 7 },
   monthly: { limit: 60, days: 30 },
   lifetime: { limit: 25, days: 30 },
@@ -33,6 +35,54 @@ const PLAN_QUOTAS: Record<string, { limit: number; days: number }> = {
 const RATE_PER_MIN = 6 // max analyses per user per minute
 const MAX_IMAGES = 4
 const MAX_IMAGE_CHARS = 6_000_000 // ~4.4 MB of base64 per image
+
+// Gemini can intermittently return 429/503 (overloaded) or just be slow on
+// multi-image vision calls. Retry transient failures with backoff and bound
+// each attempt with a timeout so a hung upstream fails cleanly instead of as
+// an opaque platform 502.
+const GEMINI_MAX_ATTEMPTS = 3
+const GEMINI_TIMEOUT_MS = 55_000 // per attempt; under typical function limits
+const GEMINI_BACKOFF_MS = [800, 2000] // waits before attempts 2 and 3
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// Returns the Gemini Response on success, or throws after exhausting retries.
+// Retries on network errors, timeouts, and 429/5xx; surfaces 4xx (other than
+// 429) immediately since those won't fix themselves.
+async function callGeminiWithRetry(url: string, body: string): Promise<Response> {
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= GEMINI_MAX_ATTEMPTS; attempt++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), GEMINI_TIMEOUT_MS)
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: ctrl.signal,
+      })
+      // Retry only on overload / server errors.
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < GEMINI_MAX_ATTEMPTS) {
+          await res.body?.cancel() // free the connection before retrying
+          await sleep(GEMINI_BACKOFF_MS[attempt - 1])
+          continue
+        }
+      }
+      return res
+    } catch (err) {
+      // Network error or abort/timeout — retry if attempts remain.
+      lastErr = err
+      if (attempt < GEMINI_MAX_ATTEMPTS) {
+        await sleep(GEMINI_BACKOFF_MS[attempt - 1])
+        continue
+      }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Gemini request failed after retries')
+}
 
 // Structured-output schema we ask Gemini to fill.
 const responseSchema = {
@@ -43,6 +93,11 @@ const responseSchema = {
     confidence: { type: 'string', enum: ['A+', 'B', 'C', 'F'] },
     bias: { type: 'string', enum: ['bullish', 'bearish', 'neutral'] },
     summary: { type: 'string' },
+    tailored: {
+      type: 'string',
+      description:
+        "How this read fits the trader's profile, e.g. which of their setups the entry is based on, or a note if none of their setups are present.",
+    },
     entry: {
       type: 'object',
       properties: {
@@ -133,6 +188,48 @@ interface Calibration {
   lessons?: string[]
 }
 
+interface TraderProfile {
+  style?: string | null
+  setups?: string[]
+  risk?: string | null
+  markets?: string[]
+}
+
+// Tailors the analysis to how this specific trader trades. The model is told to
+// frame entry/SL/TP around the trader's own setups and risk appetite — without
+// inventing a setup that isn't actually on the chart.
+function buildTraderProfileBlock(tp: TraderProfile | null): string {
+  if (!tp || (!tp.style && !(tp.setups && tp.setups.length))) return ''
+  const setups = (tp.setups || []).filter(Boolean)
+  const markets = (tp.markets || []).filter(Boolean)
+  const riskGuide: Record<string, string> = {
+    Conservative:
+      'Prefer tighter, structurally-protected stops and only high-quality entries; aim for ~2R or better and be willing to grade marginal setups lower.',
+    Balanced: 'Aim for a standard ~1.5–2R; balance entry proximity against stop safety.',
+    Aggressive:
+      'Allow wider targets and runners (3R+ where structure supports it); a slightly looser entry is acceptable to catch the move.',
+  }
+  const styleGuide: Record<string, string> = {
+    Scalper: 'Weight the lowest timeframe most; expect tight stops and nearby targets.',
+    'Day trader': 'Focus on intraday structure; the trade should make sense to open and close within a session.',
+    'Swing trader': 'Anchor on higher-timeframe structure; allow multi-day holds and wider stops/targets.',
+    'Position trader': 'Prioritize macro/higher-timeframe structure; tolerate wide stops for large moves.',
+  }
+  return `
+TAILOR TO THIS TRADER — personalize the read to how they actually trade:
+- Trading style: ${tp.style || 'unspecified'}. ${tp.style ? styleGuide[tp.style] || '' : ''}
+- Setups they trade: ${setups.length ? setups.join(', ') : 'unspecified'}.
+  PRIORITIZE these when locating the entry. If you can frame the entry as one of
+  the trader's setups that genuinely exists on the chart, do so and NAME that
+  setup in the entry rationale and the "tailored" field. If none of their setups
+  are present, say so plainly in "tailored" and grade on the cleanest real
+  structure instead — never fabricate a setup just to match their preference.
+- Risk appetite: ${tp.risk || 'unspecified'}. ${tp.risk ? riskGuide[tp.risk] || '' : ''}
+${markets.length ? `- Markets they trade: ${markets.join(', ')} — apply the volatility/session norms of these markets.` : ''}
+Set the stop-loss and take-profit consistent with the style and risk appetite above.
+`
+}
+
 function buildCalibrationBlock(cal: Calibration | null): string {
   if (!cal || !cal.decided) return ''
   const grades = (cal.perGrade || [])
@@ -150,11 +247,18 @@ Account for the mistake patterns above. Do not blindly repeat an over-optimistic
 `
 }
 
-function buildPrompt(pair: string, notes: string, tfs: string[], cal: Calibration | null) {
+function buildPrompt(
+  pair: string,
+  notes: string,
+  tfs: string[],
+  cal: Calibration | null,
+  tp: TraderProfile | null,
+) {
   return `You are an elite price-action trading analyst. You are given trading chart
 screenshots. The trader LABELLED them (in order) as: ${tfs.join(', ')}.
 ${pair ? `The instrument is ${pair}.` : ''}
 ${notes ? `Trader's note: "${notes}".` : ''}
+${buildTraderProfileBlock(tp)}
 ${buildCalibrationBlock(cal)}
 
 IMPORTANT — verify the inputs before trusting them:
@@ -204,7 +308,8 @@ Deno.serve(async (req) => {
       return json({ error: 'GEMINI_API_KEY is not configured on the function.' }, 500)
     }
 
-    const { images, pair = '', notes = '', calibration = null } = await req.json()
+    const { images, pair = '', notes = '', calibration = null, traderProfile = null } =
+      await req.json()
     if (!Array.isArray(images) || images.length === 0) {
       return json({ error: 'No images provided.' }, 400)
     }
@@ -260,17 +365,24 @@ Deno.serve(async (req) => {
 
     const planKey = subscribed ? profile?.subscription_plan || 'monthly' : 'free'
     const quota = PLAN_QUOTAS[planKey] || PLAN_QUOTAS.free
-    const periodStart = new Date(Date.now() - quota.days * 24 * 60 * 60 * 1000).toISOString()
-    const { count: usedInPeriod } = await admin
+    const usageQuery = admin
       .from('usage_events')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .gte('created_at', periodStart)
+    // Free plan (days: null) counts all-time usage → one free analysis ever.
+    // Paid plans count only within their rolling window.
+    const { count: usedInPeriod } =
+      quota.days != null
+        ? await usageQuery.gte(
+            'created_at',
+            new Date(Date.now() - quota.days * 24 * 60 * 60 * 1000).toISOString(),
+          )
+        : await usageQuery
     if ((usedInPeriod ?? 0) >= quota.limit) {
       return json(
         {
           status: 'limit_reached',
-          reason: subscribed ? 'plan_quota' : 'free_daily',
+          reason: subscribed ? 'plan_quota' : 'free_used',
           plan: planKey,
           limit: quota.limit,
           days: quota.days,
@@ -281,7 +393,9 @@ Deno.serve(async (req) => {
 
     const tfs = images.map((i: { timeframe: string }) => i.timeframe)
 
-    const parts: unknown[] = [{ text: buildPrompt(pair, safeNotes, tfs, calibration) }]
+    const parts: unknown[] = [
+      { text: buildPrompt(pair, safeNotes, tfs, calibration, traderProfile) },
+    ]
     for (const img of images) {
       parts.push({ text: `--- Timeframe: ${img.timeframe} ---` })
       parts.push({ inlineData: { mimeType: img.mimeType || 'image/png', data: img.data } })
@@ -290,18 +404,24 @@ Deno.serve(async (req) => {
     const url =
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
 
-    const geminiRes = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts }],
-        generationConfig: {
-          temperature: 0.4,
-          responseMimeType: 'application/json',
-          responseSchema,
-        },
-      }),
+    const geminiBody = JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
+        temperature: 0.4,
+        responseMimeType: 'application/json',
+        responseSchema,
+      },
     })
+
+    let geminiRes: Response
+    try {
+      geminiRes = await callGeminiWithRetry(url, geminiBody)
+    } catch (err) {
+      // All attempts exhausted (timeouts / network). Tell the client it's a
+      // transient upstream issue worth retrying, not a bad request.
+      const msg = (err as Error)?.name === 'AbortError' ? 'timed out' : (err as Error).message
+      return json({ error: 'Gemini request failed', detail: `upstream ${msg} — please try again` }, 502)
+    }
 
     if (!geminiRes.ok) {
       const detail = await geminiRes.text()
