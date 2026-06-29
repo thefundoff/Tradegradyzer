@@ -144,6 +144,18 @@ export default function Signup() {
       <Button variant="ghost" size="lg" className="w-full" onClick={() => signInWithGoogle().catch((e) => setError(e.message))}>
         Continue with Google
       </Button>
+
+      <p className="mt-5 text-center text-xs text-white/40">
+        By creating an account you agree to our{' '}
+        <Link to="/terms" className="text-white/60 underline underline-offset-2 hover:text-white">
+          Terms
+        </Link>{' '}
+        and{' '}
+        <Link to="/privacy" className="text-white/60 underline underline-offset-2 hover:text-white">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </AuthShell>
   )
 }

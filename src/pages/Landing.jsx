@@ -6,6 +6,7 @@ import GlassCard from '../components/ui/GlassCard'
 import Button from '../components/ui/Button'
 import PageTransition from '../components/ui/PageTransition'
 import { useAuthStore } from '../store/authStore'
+import { LEGAL_LINKS } from '../lib/legal'
 
 // three.js scene is heavy — load it lazily so it never blocks first paint.
 const HeroScene = lazy(() => import('../components/HeroScene'))
@@ -192,8 +193,17 @@ export default function Landing() {
           ))}
         </section>
 
-        <footer className="mt-12 border-t border-white/10 py-8 text-center text-sm text-white/40">
-          © {new Date().getFullYear()} TradeGradyzer · Not financial advice. For educational use.
+        <footer className="mt-12 border-t border-white/10 py-8 text-sm text-white/40">
+          <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2">
+            {LEGAL_LINKS.map(({ to, label }) => (
+              <Link key={to} to={to} className="text-white/55 transition-colors hover:text-white">
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <p className="mt-5 text-center">
+            © {new Date().getFullYear()} TradeGradyzer · Not financial advice. For educational use.
+          </p>
         </footer>
       </div>
     </PageTransition>

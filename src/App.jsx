@@ -17,6 +17,11 @@ import AnalysisResult from './pages/AnalysisResult'
 import History from './pages/History'
 import Pricing from './pages/Pricing'
 import Settings from './pages/Settings'
+import PrivacyPolicy from './pages/legal/PrivacyPolicy'
+import Terms from './pages/legal/Terms'
+import RefundPolicy from './pages/legal/RefundPolicy'
+import Disclaimer from './pages/legal/Disclaimer'
+import ComplaintsPolicy from './pages/legal/ComplaintsPolicy'
 
 export default function App() {
   const init = useAuthStore((s) => s.init)
@@ -36,6 +41,13 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Public legal / policy pages */}
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
+          <Route path="/disclaimer" element={<Disclaimer />} />
+          <Route path="/complaints" element={<ComplaintsPolicy />} />
 
           <Route
             path="/onboarding"

@@ -12,6 +12,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
+import { LEGAL_LINKS } from '../../lib/legal'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -141,6 +142,19 @@ export default function AppLayout() {
 
         <main className="flex-1 px-4 pb-28 pt-2 md:px-8 md:pb-10 md:pt-6">
           <Outlet />
+
+          <footer className="mt-12 border-t border-white/10 pt-6 text-xs text-white/35">
+            <nav className="flex flex-wrap gap-x-4 gap-y-2">
+              {LEGAL_LINKS.map(({ to, label }) => (
+                <Link key={to} to={to} className="transition-colors hover:text-white/70">
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            <p className="mt-3">
+              © {new Date().getFullYear()} TradeGradyzer · Not financial advice. For educational use.
+            </p>
+          </footer>
         </main>
       </div>
 
